@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html data-bs-theme="light" lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
+    <title>Dice Game - Player</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='bootstrap/css/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300italic,400italic,600italic,700italic,800,400,300,600,700&amp;display=swap">
+</head>
+<body>
+    <section class="py-5">
+        <div class="container py-5">
+            <div class="row mb-4 mb-lg-5">
+                <div class="col-md-8 col-xl-6 text-center mx-auto">
+                    <p class="fw-bold text-success mb-2">Dice Game</p>
+                    <h2 class="fw-bold">Welcome! Please enter your details</h2>
+                </div>
+            </div>
+            <div class="row d-flex justify-content-center">
+                <div class="col-md-6 col-xl-4">
+                    <div class="card">
+                        <div class="card-body text-center d-flex flex-column align-items-center">
+                            <form id="playerForm">
+                                <div class="mb-3"><input class="form-control" type="text" id="name" name="name" placeholder="Player Name" required></div>
+                                <div class="mb-3"><button class="btn btn-primary shadow d-block w-100" type="button" id="submitBtn">Join Game</button></div>
+                                <p class="text-muted" id="playerCount">(0 / 10) Waiting for players...</p>
+                                <p class="text-muted" id="playerThrow"></p>
+                                <p class="text-muted" id="roundResult"></p>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    <script src="{{ url_for('static', filename='bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const socket = io();
+            const playerLatency = {{ spieler_latenz }};
+            const roundDuration = {{ dauer_der_runde }};
+
+            socket.on('connect', () => console.log('Connected to server'));
+            socket.on('disconnect', () => console.log('Disconnected from server'));
+
+            socket.on('update_player_count', data => {
+                document.getElementById('playerCount').innerText = `(${data.count} / 10) Waiting for players...`;
+            });
+
+            socket.on('start', data => {
+                console.log('Round starting!');
+                document.getElementById('roundResult').innerText = '';
+                const clientStartTime = new Date().toISOString().slice(11, -1); // Stunden:Minuten:Sekunden:Millisekunden
+                const latency = Math.random() * playerLatency;
+                setTimeout(() => {
+                    const throwValue = Math.floor(Math.random() * 100) + 1;
+                    const playerName = document.getElementById('name').value;
+                    const clientSendTime = new Date().toISOString().slice(11, -1); // Stunden:Minuten:Sekunden:Millisekunden
+                    socket.emit('player_throw', {
+                        name: playerName,
+                        throw: throwValue,
+                        client_start_time: clientStartTime,
+                        client_latency: latency.toFixed(3),
+                        client_send_time: clientSendTime
+                    });
+                    document.getElementById('playerThrow').innerText = `You rolled: ${throwValue}`;
+                    console.log(`Player ${playerName} rolled ${throwValue}`);
+                }, latency * 1000);
+            });
+
+            socket.on('stop', () => console.log('Round stopping!'));
+
+            socket.on('round_result', data => {
+                document.getElementById('roundResult').innerText = `Winner: ${data.winner} with a score of ${data.score}`;
+            });
+
+            socket.on('test_message', data => console.log(data.message));
+
+            document.getElementById('submitBtn').onclick = () => {
+                const playerName = document.getElementById('name').value;
+                socket.emit('player_data', { name: playerName });
+                document.getElementById('name').disabled = true;
+                document.getElementById('submitBtn').disabled = true;
+            };
+        });
+    </script>
+</body>
+</html>
